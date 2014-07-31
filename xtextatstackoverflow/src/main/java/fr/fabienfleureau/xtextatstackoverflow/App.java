@@ -1,5 +1,6 @@
 package fr.fabienfleureau.xtextatstackoverflow;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -9,6 +10,7 @@ import com.google.code.stackexchange.client.query.StackExchangeApiQueryFactory;
 
 import fr.fabienfleureau.xtextatstackoverflow.data.QuestionBaseService;
 import fr.fabienfleureau.xtextatstackoverflow.stackoverflow.CheckQuestionTask;
+import fr.fabienfleureau.xtextatstackoverflow.stackoverflow.InitQuestionsTask;
 import fr.fabienfleureau.xtextatstackoverflow.stackoverflow.StackoverflowService;
 import fr.fabienfleureau.xtextatstackoverflow.twitter.TwitterObserver;
 
@@ -17,6 +19,7 @@ import fr.fabienfleureau.xtextatstackoverflow.twitter.TwitterObserver;
  *
  */
 public class App {
+	private static final int DELAY_BETWEEN_QUESTION_CHECK = 300;
 	private static final String XTEXT_TAG = "java";
 
 	public static void main(String[] args) {
@@ -26,14 +29,30 @@ public class App {
 		// Init query
 		QuestionApiQuery questionApiQuery = queryFactory.newQuestionApiQuery().withTags(XTEXT_TAG);
 		StackoverflowService.getInstance().setQuery(questionApiQuery);
-		ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
-		CheckQuestionTask questionTask = new CheckQuestionTask(questionBaseService);
+		initializeQuestionsBase();
+		CheckQuestionTask questionTask = new CheckQuestionTask(QuestionBaseService.getInstance());
+		// Add twitter Observer
+		questionTask.addObserver(questionBaseService);
+		questionTask.addObserver(new TwitterObserver());
+		Executors.newScheduledThreadPool(1).scheduleAtFixedRate(questionTask, 0, DELAY_BETWEEN_QUESTION_CHECK, TimeUnit.SECONDS);
+	}
+
+	private static void initializeQuestionsBase() {
 		// Add existing questions
 		System.out.println("Initialisation : Add existing questions");
-		questionTask.addObserver(questionBaseService);
-		// Add twitter Observer
-		questionTask.firstRunThenAddObserver(new TwitterObserver());
-		executorService.scheduleAtFixedRate(questionTask, 0, 30, TimeUnit.SECONDS);
+		InitQuestionsTask initQuestionsTask = new InitQuestionsTask();
+		ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
+		executorService.scheduleAtFixedRate(initQuestionsTask, 0, 30, TimeUnit.SECONDS);
+		try {
+			Boolean initialized = initQuestionsTask.get();
+			if (initialized.booleanValue()) {
+				System.out.println("Initialisation done.");
+			}
+		} catch (InterruptedException | ExecutionException e) {
+			e.printStackTrace();
+		} finally {
+			executorService.shutdown();
+		}
 	}
 	
 }

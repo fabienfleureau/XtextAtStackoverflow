@@ -1,31 +1,23 @@
 package fr.fabienfleureau.xtextatstackoverflow.twitter;
 
-import java.io.IOException;
-import java.util.Properties;
-
-import twitter4j.Twitter;
-import twitter4j.TwitterException;
-import twitter4j.TwitterFactory;
-import twitter4j.auth.AccessToken;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class TwitterService {
-
-	private String consumerKeyStr = "XXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-	private String consumerSecretStr = "XXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-	private String accessTokenStr = "XXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-	private String accessTokenSecretStr = "XXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-	  
 	
+	private static Long delayBetweenTweets = 120L;
 	private static TwitterService instance;
-	private Twitter twitter;
+
+	private final Queue<String> pendingTweets = new ConcurrentLinkedQueue<>();
+	private final TwitterWrapper twitterWrapper = TwitterWrapper.getInstance();
+	
+	private Optional<ScheduledExecutorService> currentExecutor = Optional.empty();
 
 	private TwitterService() {
-		twitter = new TwitterFactory().getInstance();
-		Properties twitterProperties = getPropertiesResource();
-		consumerKeyStr = twitterProperties.getProperty("consumerKeyStr");
-		consumerSecretStr = twitterProperties.getProperty("consumerSecretStr");
-		accessTokenStr = twitterProperties.getProperty("accessTokenStr");
-		accessTokenSecretStr = twitterProperties.getProperty("accessTokenSecretStr");
 	}
 	
 	public static TwitterService getInstance() {
@@ -35,39 +27,24 @@ public class TwitterService {
 		return instance;
 	}
 	
-	public void tweet(String content) {
-		try {
-			twitter.setOAuthConsumer(consumerKeyStr, consumerSecretStr);
-			AccessToken accessToken = new AccessToken(accessTokenStr, accessTokenSecretStr);
-
-			twitter.setOAuthAccessToken(accessToken);
-
-			twitter.updateStatus(content);
-
-			System.out.println("Successfully updated the status in Twitter: " + content);
-		} catch (TwitterException te) {
-			te.printStackTrace();
+	public void addToQueue(String content) {
+		pendingTweets.add(content);
+		if (!currentExecutor.isPresent() || currentExecutor.get().isTerminated()) {
+			ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+			executor.scheduleAtFixedRate(() -> {
+				if (!pendingTweets.isEmpty()) {
+					twitterWrapper.tweet(pendingTweets.remove());
+				} else {
+					executor.shutdown();
+				}
+			}, 0, delayBetweenTweets, TimeUnit.SECONDS);
+			currentExecutor = Optional.of(executor);
 		}
-		System.out.println("TWEET: " + content);
 	}
-	    
-	    public static Properties getPropertiesResource() {
-	    	Properties properties = new Properties();
-	            ClassLoader cl = Thread.currentThread().getContextClassLoader();
-	            java.io.InputStream is = cl.getResourceAsStream("twittersecret.properties");
-	            if (is != null) {
-	                try {
-	                	properties.load(is);
-	                } catch (IOException e) {
-	                	System.err.println(e);
-	                }
-	            }
-	 
-	        return properties;
-	    }
-	    
-	    public static void main(String[] args) {
-			TwitterService testInstance = TwitterService.getInstance();
-			testInstance.tweet("test");
-		}
+
+	public static void main(String[] args) {
+		TwitterService testTwitterService = TwitterService.getInstance();
+		testTwitterService.addToQueue("1er tweet");
+		testTwitterService.addToQueue("2nd tweet, 2 minutes plus tard");
+	}
 }

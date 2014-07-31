@@ -23,7 +23,7 @@ public class TwitterObserver implements Observer {
 
 	public void update(Observable paramObservable, Question question) {
 		String tweetContent = computeTweet(question);
-		twitterService.tweet(tweetContent);
+		twitterService.addToQueue(tweetContent);
 	}
 
 	private String computeTweet(Question question) {
