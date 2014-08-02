@@ -5,7 +5,9 @@ import java.util.Date;
 import java.util.Properties;
 
 import twitter4j.Twitter;
+import twitter4j.TwitterException;
 import twitter4j.TwitterFactory;
+import twitter4j.auth.AccessToken;
 
 public class TwitterWrapper {
 
@@ -28,11 +30,19 @@ public class TwitterWrapper {
 	private TwitterWrapper() {
 		twitter = new TwitterFactory().getInstance();
 		Properties twitterProperties = getPropertiesResource();
-		consumerKeyStr = twitterProperties.getProperty("consumerKeyStr");
-		consumerSecretStr = twitterProperties.getProperty("consumerSecretStr");
-		accessTokenStr = twitterProperties.getProperty("accessTokenStr");
-		accessTokenSecretStr = twitterProperties
-				.getProperty("accessTokenSecretStr");
+		if (twitterProperties.isEmpty()) {
+			consumerKeyStr = twitterProperties.getProperty("consumerKeyStr");
+			consumerSecretStr = twitterProperties
+					.getProperty("consumerSecretStr");
+			accessTokenStr = twitterProperties.getProperty("accessTokenStr");
+			accessTokenSecretStr = twitterProperties
+					.getProperty("accessTokenSecretStr");
+		} else {
+			consumerKeyStr = System.getenv("consumerKeyStr");
+			consumerSecretStr = System.getenv("consumerSecretStr");
+			accessTokenStr = System.getenv("accessTokenStr");
+			accessTokenSecretStr = System.getenv("accessTokenSecretStr");
+		}
 	}
 
 	private static Properties getPropertiesResource() {
@@ -52,20 +62,20 @@ public class TwitterWrapper {
 
 	public void tweet(String content) {
 		System.out.println(new Date() + " TWEET: " + content);
-		// try {
-		// twitter.setOAuthConsumer(consumerKeyStr, consumerSecretStr);
-		// AccessToken accessToken = new AccessToken(accessTokenStr,
-		// accessTokenSecretStr);
-		//
-		// twitter.setOAuthAccessToken(accessToken);
-		//
-		// twitter.updateStatus(content);
+		try {
+			if (!twitter.getAuthorization().isEnabled()) {
+				twitter.setOAuthConsumer(consumerKeyStr, consumerSecretStr);
+				AccessToken accessToken = new AccessToken(accessTokenStr,
+						accessTokenSecretStr);
+				twitter.setOAuthAccessToken(accessToken);
+			}
+			twitter.updateStatus(content);
 
-		// System.out.println("Successfully updated the status in Twitter: " +
-		// content);
-		// } catch (TwitterException te) {
-		// te.printStackTrace();
-		// }
+			System.out.println("Successfully updated the status in Twitter: "
+					+ content);
+		} catch (TwitterException te) {
+			te.printStackTrace();
+		}
 	}
 
 	public static void main(String[] args) {
