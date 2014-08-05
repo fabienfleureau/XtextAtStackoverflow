@@ -30,7 +30,7 @@ public class TwitterWrapper {
 	private TwitterWrapper() {
 		twitter = new TwitterFactory().getInstance();
 		Properties twitterProperties = getPropertiesResource();
-		if (twitterProperties.isEmpty()) {
+		if (!twitterProperties.isEmpty()) {
 			consumerKeyStr = twitterProperties.getProperty("consumerKeyStr");
 			consumerSecretStr = twitterProperties
 					.getProperty("consumerSecretStr");
@@ -43,6 +43,22 @@ public class TwitterWrapper {
 			accessTokenStr = System.getenv("accessTokenStr");
 			accessTokenSecretStr = System.getenv("accessTokenSecretStr");
 		}
+		showVariables();
+	}
+
+	private String sixFirstCharacters(String string) {
+		if (string == null) {
+			return "";
+		}
+		int length = Integer.min(6, string.length());
+		return string.substring(0, length - 1);
+	}
+	
+	private void showVariables() {
+		System.out.println("consumerKeyStr: " + sixFirstCharacters(consumerKeyStr));
+		System.out.println("consumerSecretStr: " + sixFirstCharacters(consumerSecretStr));
+		System.out.println("accessTokenStr: " + sixFirstCharacters(accessTokenStr));
+		System.out.println("accessTokenSecretStr: " + sixFirstCharacters(accessTokenSecretStr));
 	}
 
 	private static Properties getPropertiesResource() {
